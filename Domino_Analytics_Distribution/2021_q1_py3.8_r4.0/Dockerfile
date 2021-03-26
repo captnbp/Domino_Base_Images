@@ -161,10 +161,8 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys B97B0AFCAA1A47F044F
 # Add workspace install and configuration scripts
 RUN \
     cd /tmp && \
-    wget -q https://github.com/dominodatalab/workspace-configs/archive/2021q1-v1.zip && \
-    unzip 2021q1-v1.zip && \
-    cp -Rf workspace-configs-2021q1-v1/. /var/opt/workspaces && \
-    rm -rf /var/opt/workspaces/workspace-logos && rm -rf /tmp/workspace-configs-2021q1-v1 && \
+    git clone https://github.com/captnbp/workspace-configs.git /var/opt/workspaces && \
+    rm -rf /var/opt/workspaces/workspace-logos && \
 # Jupyter
     chmod +x /var/opt/workspaces/jupyter/install && \
     /var/opt/workspaces/jupyter/install && \
