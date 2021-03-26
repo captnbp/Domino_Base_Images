@@ -1,6 +1,6 @@
 
 
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 LABEL maintainer="Domino Data Lab <support@dominodatalab.com>"
 LABEL "com.dominodatalab.www"="Domino Data Lab"
 LABEL description="Domino Analytics Distribution"
@@ -23,20 +23,11 @@ RUN \
   locale-gen en_US.UTF-8 && \
   dpkg-reconfigure locales && \
 # INSTALL common things
-  apt-get -y install build-essential wget sudo curl apt-utils net-tools libzmq3-dev ed git ca-certificates iputils-ping dnsutils telnet apt-transport-https vim python3-pip jq unzip && \
+  apt-get -y install build-essential wget curl apt-utils net-tools libzmq3-dev ed git ca-certificates iputils-ping dnsutils telnet apt-transport-https vim python3-pip jq unzip krb5-kdc krb5-admin-server && \
   apt-get install openjdk-8-jdk -y && \
   update-alternatives --config java && \
   echo "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> /home/ubuntu/.domino-defaults && \
   apt-get -y --no-install-recommends install libssl-dev libxml2-dev libxt-dev libssh2-1-dev libcurl4-openssl-dev libsasl2-dev && \
-# AWS CLI
-  curl -sL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" &&   unzip awscliv2.zip && \
-  aws/install  && \
-  rm -rf awscliv2.zip aws && \
-# ADD SSH start script for Domino <4.x
-  apt-get install openssh-server -y && \
-  mkdir -p /scripts && \
-  printf "#!/bin/bash\\nservice ssh start\\n" > /scripts/start-ssh && \
-  chmod +x /scripts/start-ssh && \
   echo 'export PYTHONIOENCODING=utf-8' >> /home/ubuntu/.domino-defaults && \
   echo 'export LANG=en_US.UTF-8' >> /home/ubuntu/.domino-defaults && \
   echo 'export JOBLIB_TEMP_FOLDER=/tmp' >> /home/ubuntu/.domino-defaults && \
@@ -44,38 +35,6 @@ RUN \
   locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-
-###############################################################
-#                    sudo bug only 20.04                      #
-###############################################################
-RUN echo "Set disable_coredump false" >> /etc/sudo.conf
-
-#######################################################
-#                   Install R Base                    #
-#######################################################
-ENV R_BASE_VERSION 4.0.3
-RUN \
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9 && \
-    add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu bionic-cran40/' && \
-    apt-get update -y && \
-    apt-get install \
-        r-base=${R_BASE_VERSION}-* \
-        r-base-dev=${R_BASE_VERSION}-* -y && \
-# Dependencies of various R packages
-    apt-get install -y unixodbc-dev libgdal-dev libcairo2-dev  libxt-dev libgmp3-dev jags libgsl0-dev libx11-dev mesa-common-dev libglu1-mesa-dev libmpfr-dev libfftw3-dev libtiff5-dev libudunits2-dev libopenmpi-dev libmysqlclient-dev libgit2-dev -y && \
-# Required for rJava
-    export LD_LIBRARY_PATH=/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64/server && \
-    echo "export LD_LIBRARY_PATH=/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64/server:\${LD_LIBRARY_PATH:-}" >> /home/ubuntu/.domino-defaults && \
-    R CMD javareconf
-# Install R packages required by Domino and some extras that are good to have
-RUN Rscript -e "install.packages(c('devtools','usethis'))"
-RUN apt-get install -y libsodium-dev libhiredis-dev libv8-dev
-COPY r_packages.txt .
-RUN while IFS=" " read -r package; do Rscript -e "devtools::install_version('"$package"')"; done < "r_packages.txt" && \
-    rm -rf /usr/local/lib/R/site-library/XLConnect/unitTests/resources/testBug61.xlsx && \
-    chown -R ubuntu:ubuntu /usr/local/lib/R/site-library
-# Conflict with unixodbc so needs separate install line
-RUN apt-get install -y libiodbc2-dev
 
 ###############################################################
 #                 Python 3.8 and Miniconda                    #
@@ -118,23 +77,25 @@ RUN \
     apt-get install -y --no-install-recommends \
         libhdf5-dev libyaml-dev pkg-config libfuse-dev cups libcups2-dev python-gi \
         python-gi-cairo python3-gi python3-gi-cairo gir1.2-gtk-3.0 libsmbclient-dev python-debian swig \
-        curl libcurl4-openssl-dev libssl-dev pandoc libgmp-dev libmpfr-dev libmpc-dev
+        curl libcurl4-openssl-dev libssl-dev pandoc libgmp-dev libmpfr-dev libmpc-dev && \
+#Cleanup
+    conda clean --all --yes && \
+    pip cache purge && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -Rf /tmp/*
 # Install Domino Dependencies 
 # Packages used for model APIs and Apps and some extras that are useful
 COPY requirements.txt .
 RUN $CONDA_DIR/bin/conda install -c conda-forge uWSGI && \
-    pip install -r requirements.txt
+    pip install -r requirements.txt && \
+    pip cache purge
 # Install packages used in Domino quick-start project
 RUN pip install git+https://github.com/dominodatalab/python-domino.git
 # Configure matplotlib
 RUN mkdir -p /home/ubuntu/.config/matplotlib && \
     echo "backend : Cairo" > /home/ubuntu/.config/matplotlib/matplotlibrc  && \
     sed -i 's/backend      : TkAgg/backend      : Cairo/g' /opt/conda/lib/python3.8/site-packages/matplotlib/mpl-data/matplotlibrc
-
-###############################################################
-#                        Kerberos                             #
-###############################################################
-RUN apt-get install -y krb5-kdc krb5-admin-server
 
 #######################################################
 #  Install drivers for common data source connections #
@@ -153,14 +114,19 @@ RUN \
     ln -s /lib/x86_64-linux-gnu/libssl.so.1.0.0 /lib/x86_64-linux-gnu/libssl.so.10 && \
     ln -s /lib/x86_64-linux-gnu/libcrypto.so.1.0.0 /lib/x86_64-linux-gnu/libcrypto.so.10 && \
     ldconfig && \
-    rm -rf /tmp/*
+    rm -rf /tmp/* && \
+#Cleanup
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -Rf /tmp/*
+# Install Domino De
 # Oracle
 # ROracle & PyOracle
-RUN R --no-save -e "install.packages(c('DBI'))" && \
+RUN \
     mkdir -p /opt/oracle && \
     wget -q https://s3-us-west-2.amazonaws.com/domino-deployment/2016/02/22/instantclient-basic-linux.x64-12.1.0.2.0.zip -O /opt/oracle/instantclient-basic-linux.x64-12.1.0.2.0.zip && \
     wget -q https://s3-us-west-2.amazonaws.com/domino-deployment/2016/02/22/instantclient-sdk-linux.x64-12.1.0.2.0.zip -O /opt/oracle/instantclient-sdk-linux.x64-12.1.0.2.0.zip && \
-    apt-get install libaio1 && \
+    apt-get update -y && apt-get install libaio1 && \
     mkdir -p /opt/oracle/instantclient_12_1 && \
     cd /opt/oracle && \
     unzip instantclient-basic-linux.x64-12.1.0.2.0.zip && \
@@ -177,130 +143,18 @@ RUN R --no-save -e "install.packages(c('DBI'))" && \
     ldconfig -v && \
     export PATH=/opt/oracle/instantclient_12_1:${PATH:-} && \
     export LD_LIBRARY_PATH=/opt/oracle/instantclient_12_1:${LD_LIBRARY_PATH:-} && \
-    pip install cx_Oracle  && \
+    pip install cx_Oracle && \
+    pip cache purge && \
     cd /home/ubuntu && \
-    wget -q https://cran.r-project.org/src/contrib/ROracle_1.3-1.tar.gz && \
-    R CMD INSTALL --configure-args='--with-oci-inc=/opt/oracle/instantclient_12_1/sdk/include --with-oci-lib=/opt/oracle/instantclient_12_1' ROracle_1.3-1.tar.gz && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /opt/oracle/instantclient-basic-linux.x64-12.1.0.2.0.zip && \
     rm -rf /opt/oracle/instantclient-sdk-linux.x64-12.1.0.2.0.zip
 # Install PostgreSQL client
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8 && \
-    echo "deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+    echo "deb http://apt.postgresql.org/pub/repos/apt/ focal-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
     apt-get update && apt-get -y -q install postgresql-13 postgresql-client-13 postgresql-contrib-13 && \
     rm -rf /var/lib/apt/lists/*
 
-#######################################################
-#                  R KERNEL IN JUPYTER                #
-#######################################################
-RUN R --no-save -e "install.packages(c('devtools'))" && \
-    R --no-save -e 'install.packages("pbdZMQ", clean=TRUE)'
-USER ubuntu
-RUN R --no-save -e 'devtools::install_github("IRkernel/IRkernel"); IRkernel::installspec()'
-# Scala Kernel
-USER root
-RUN mkdir -p /usr/local/share/jupyter && \
-    chown ubuntu:ubuntu -R /usr/local/share/jupyter && \
-    echo 'export SCALA_HOME=/usr/share/scala' >> /home/ubuntu/.domino-defaults && \
-    echo 'export PATH=$PATH:$SCALA_HOME/bin:$PATH' >> /home/ubuntu/.domino-defaults && \
-    echo 'export PATH=$PATH:/tmp:$PATH' >> /home/ubuntu/.domino-defaults
-USER ubuntu
-RUN export SCALA_VERSION=2.12.9 && \
-    export ALMOND_VERSION=0.10.9 && \
-    export KERNEL_ID=scala && \
-    cd /tmp && curl -L -o coursier https://git.io/coursier-cli && chmod +x coursier && \
-    ./coursier launch --fork almond:$ALMOND_VERSION --scala $SCALA_VERSION -- --install --global --id $KERNEL_ID --display-name "Scala ($SCALA_VERSION)" --force
-USER root
-# SBT
-RUN \
-    echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list && \
-    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823 && \
-    apt-get update -y && \
-    apt-get install sbt -y && \
-# Julia
-    rm -rf /usr/bin/julia && \
-    cd /home/ubuntu && \
-    wget -q https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.3-linux-x86_64.tar.gz && \
-    tar xzf julia-1.5.3-linux-x86_64.tar.gz && \
-    chown -R ubuntu:ubuntu /home/ubuntu/julia-1.5.3 && \
-    ln -s /home/ubuntu/julia-1.5.3/bin/julia /usr/bin/julia && \
-    rm -rf /home/ubuntu/julia-1.5.3-linux-x86_64.tar.gz && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -Rf /tmp/*
-USER ubuntu
-RUN julia -e 'using Pkg; Pkg.update(); Pkg.add("IJulia")'
-USER root
-
-#######################################################
-#         Install CUDA and GPU dependencies           #
-#######################################################
-# https://gitlab.com/nvidia/container-images/cuda/-/blob/master/dist/10.1/ubuntu18.04-x86_64/base/Dockerfile
-# Install CUDA Base
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gnupg2 curl ca-certificates && \
-    curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - && \
-    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
-    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
-    apt-get purge --autoremove -y curl && \
-    rm -rf /var/lib/apt/lists/*
-ENV CUDA_VERSION 10.1.243
-ENV CUDA_PKG_VERSION 10-1=$CUDA_VERSION-1
-# For libraries in the cuda-compat-* package: https://docs.nvidia.com/cuda/eula/index.html#attachment-a
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    cuda-cudart-$CUDA_PKG_VERSION \
-    cuda-compat-10-1 \
-    && ln -s cuda-10.1 /usr/local/cuda && \
-    rm -rf /var/lib/apt/lists/*
-# Required for nvidia-docker v1
-RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
-    echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
-ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
-# nvidia-container-runtime
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=10.1 brand=tesla,driver>=396,driver<397 brand=tesla,driver>=410,driver<411 brand=tesla,driver>=418,driver<419"
-
-# See version of CUDA for version of Tensorflow: https://www.tensorflow.org/install/source#gpu
-# https://github.com/tensorflow/tensorflow/blob/v2.3.2/tensorflow/tools/dockerfiles/dockerfiles/gpu.Dockerfile
-ENV UBUNTU_VERSION=18.04
-ENV CUDA=10.1
-ENV CUDNN=7.6.4.38-1
-ENV CUDNN_MAJOR_VERSION=7
-ENV LIB_DIR_PREFIX=x86_64
-ENV LIBNVINFER=6.0.1-1
-ENV LIBNVINFER_MAJOR_VERSION=6
-SHELL ["/bin/bash", "-c"]
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        cuda-command-line-tools-${CUDA/./-} \
-        # There appears to be a regression in libcublas10=10.2.2.89-1 which
-        # prevents cublas from initializing in TF. See
-        # https://github.com/tensorflow/tensorflow/issues/9489#issuecomment-562394257
-        libcublas10=10.2.1.243-1 \ 
-        cuda-nvrtc-${CUDA/./-} \
-        cuda-cufft-${CUDA/./-} \
-        cuda-curand-${CUDA/./-} \
-        cuda-cusolver-${CUDA/./-} \
-        cuda-cusparse-${CUDA/./-} \
-        libcudnn7=${CUDNN}+cuda${CUDA} \
-        libfreetype6-dev \
-        libhdf5-serial-dev
-# Install TensorRT if not building for PowerPC
-RUN [[ "${ARCH}" = "ppc64le" ]] || { apt-get update && \
-        apt-get install -y --no-install-recommends libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${CUDA} \
-        libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda${CUDA} \
-        && apt-get clean \
-        && rm -rf /var/lib/apt/lists/*; }
-# For CUDA profiling, TensorFlow requires CUPTI.
-ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-# Link the libcuda stub to the location where tensorflow is searching for it and reconfigure
-# dynamic linker run-time bindings
-RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
-    && echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/z-cuda-stubs.conf \
-    && ldconfig
-ENV TF_PACKAGE=tensorflow-gpu
-ENV TF_PACKAGE_VERSION=2.3.0
-RUN pip install --no-cache-dir ${TF_PACKAGE}${TF_PACKAGE_VERSION:+==${TF_PACKAGE_VERSION}}
 #######################################################
 #      Installing Notebooks,Workspaces,IDEs,etc       #
 #######################################################
@@ -311,12 +165,6 @@ RUN \
     unzip 2021q1-v1.zip && \
     cp -Rf workspace-configs-2021q1-v1/. /var/opt/workspaces && \
     rm -rf /var/opt/workspaces/workspace-logos && rm -rf /tmp/workspace-configs-2021q1-v1 && \
-# RStudio
-# Adding .Rprofile with Domino customizations
-    mv /var/opt/workspaces/rstudio/.Rprofile /home/ubuntu/.Rprofile && \
-    chown ubuntu:ubuntu /home/ubuntu/.Rprofile && \
-    chmod +x /var/opt/workspaces/rstudio/install  && \
-    /var/opt/workspaces/rstudio/install && \
 # Jupyter
     chmod +x /var/opt/workspaces/jupyter/install && \
     /var/opt/workspaces/jupyter/install && \
@@ -333,34 +181,40 @@ RUN \
     conda install -y -c conda-forge nodejs && \
     pip install jupyter-server-proxy && \
     jupyter labextension install @jupyterlab/server-proxy && \
-    chown -R ubuntu:ubuntu /home/ubuntu/
+    chown -R ubuntu:ubuntu /home/ubuntu/ && \
+#Cleanup
+    pip cache purge && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -Rf /tmp/*
+# Install Domino De
 
 #######################################################
 #                     Some fixes                      #
 #######################################################
-RUN apt-get update && apt-get install -y curl && \
-    pip install pyodbc tensorflow-gpu && \
+RUN pip install pyodbc tensorflow && \
+    pip cache purge
 # Provide Sudo in container
-    echo "ubuntu    ALL=NOPASSWD: ALL" >> /etc/sudoers && \
+    #echo "ubuntu    ALL=NOPASSWD: ALL" >> /etc/sudoers && \
 # Fix some npm modules manually that ship with ALL current versions of nodejs
-    npm init -y && \
+RUN npm init -y && \
     npm --depth 9999 update && npm -g --depth 9999 update && \
 # DOT-PROP. One can force replace it like this.
     rm -Rf /usr/lib/node_modules/npm/node_modules/dot-prop && \
-    wget -qO- https://github.com/sindresorhus/dot-prop/archive/v5.2.0.tar.gz -P /usr/lib/node_modules/npm/node_modules/dot-prop | tar zxvf - --strip-components=1 && \
+    wget -qO- https://github.com/sindresorhus/dot-prop/archive/v6.0.1.tar.gz -P /usr/lib/node_modules/npm/node_modules/dot-prop | tar zxvf - --strip-components=1 && \
 # QS. qs have equal issues but for fun node-gyp installs one globally /usr/lib/nodejs/qs and one in the npm modules directory /usr/lib/node_modules/npm/node_modules/qs. Upgrading the qs modules
-    rm -Rf /usr/lib/nodejs/qs /usr/lib/node_modules/npm/node_modules/qs && \
-    wget -qO- https://github.com/ljharb/qs/archive/v6.9.4.tar.gz -P /usr/lib/nodejs/qs | tar zxvf - --strip-components=1 && \
-    wget -qO- https://github.com/ljharb/qs/archive/v6.9.4.tar.gz -P /usr/lib/node_modules/npm/node_modules/qs | tar zxvf - --strip-components=1 && \
+    #rm -Rf /usr/lib/nodejs/qs /usr/lib/node_modules/npm/node_modules/qs && \
+    #wget -qO- https://github.com/ljharb/qs/archive/v6.10.1.tar.gz -P /usr/lib/nodejs/qs | tar zxvf - --strip-components=1
+    #wget -qO- https://github.com/ljharb/qs/archive/v6.10.1.tar.gz -P /usr/lib/node_modules/npm/node_modules/qs | tar zxvf - --strip-components=1 && echo STEP3 && \
 # FSTREAM. Some fstream fun /usr/lib/nodejs/fstream
-    rm -Rf /usr/lib/nodejs/fstream && \
-    wget -qO- https://github.com/npm/fstream/archive/v1.0.12.tar.gz /usr/lib/nodejs/fstream | tar zxvf - --strip-components=1 && \
+    #rm -Rf /usr/lib/nodejs/fstream && \
+    #wget -qO- https://github.com/npm/fstream/archive/v1.0.12.tar.gz /usr/lib/nodejs/fstream | tar zxvf - --strip-components=1 && echo STEP4 &&\
 # Some manual clean-ups
 # Let's start with VSCode Handlebars Extension
     rm -Rf /opt/code-server/lib/vscode/extensions/handlebars && \
 # Fix handlebars which does not work to update with npm but needs yarn
-    curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - && \
-    echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list && \
+    curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
+    echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
     apt update && apt install -y yarn && \
     apt update && apt install -y --no-install-recommends yarn && \
     yarn add handlebars && \
@@ -376,20 +230,22 @@ RUN apt-get update && apt-get install -y curl && \
     npm upgrade --prefix /opt/code-server/node_modules/http-proxy/ && \
 # Fix serialize-javascript
     sed -i 's/\"2.1.2"/\"4.0.0"/g' /opt/conda/share/jupyter/lab/staging/node_modules/serialize-javascript/package.json && \
-    npm upgrade --prefix /opt/conda/share/jupyter/lab/staging/node_modules/serialize-javascript/
+    npm upgrade --prefix /opt/conda/share/jupyter/lab/staging/node_modules/serialize-javascript/ && \
+#Cleanup
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -Rf /tmp/*
+# Install Domino De
 
 ###############################################################
 #                       Jupyterlab Git                        #
 ###############################################################
-RUN pip install --upgrade jupyterlab-git && jupyter lab build
+RUN pip install --upgrade jupyterlab-git && jupyter lab build && \
+    pip cache purge
 
 ###############################################################
 #                         Clean Up                            #
 ###############################################################
-RUN apt-get clean && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -Rf /tmp/*
 # Removing coursier due to security vulnerabilities
 RUN rm -rf /home/ubuntu/.cache/coursier
 # Removing PyYAML due to security vulnerabilities. Was not pip installed, so removing manually
