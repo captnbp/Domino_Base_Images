@@ -82,7 +82,7 @@ RUN \
 # Set permissions
     chown -R ubuntu:ubuntu  $CONDA_DIR && \
 # Upgrade Pip
-    pip install --upgrade pip && \
+    pip install --no-cache-dir --upgrade pip && \
 # Add various package dependencies and useful libraries
     apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -99,10 +99,10 @@ RUN \
 # Packages used for model APIs and Apps and some extras that are useful
 COPY requirements.txt .
 RUN $CONDA_DIR/bin/conda install -c conda-forge uWSGI && \
-    pip install -r requirements.txt && \
+    pip install --no-cache-dir -r requirements.txt && \
     pip cache purge
 # Install packages used in Domino quick-start project
-RUN pip install git+https://github.com/dominodatalab/python-domino.git
+RUN pip install --no-cache-dir git+https://github.com/dominodatalab/python-domino.git
 # Configure matplotlib
 RUN mkdir -p /home/ubuntu/.config/matplotlib && \
     echo "backend : Cairo" > /home/ubuntu/.config/matplotlib/matplotlibrc  && \
@@ -154,7 +154,7 @@ RUN \
     ldconfig -v && \
     export PATH=/opt/oracle/instantclient_12_1:${PATH:-} && \
     export LD_LIBRARY_PATH=/opt/oracle/instantclient_12_1:${LD_LIBRARY_PATH:-} && \
-    pip install cx_Oracle && \
+    pip install --no-cache-dir cx_Oracle && \
     pip cache purge && \
     cd /home/ubuntu && \
     rm -rf /var/lib/apt/lists/* && \
@@ -178,8 +178,8 @@ RUN \
     chmod +x /var/opt/workspaces/jupyter/install && \
     /var/opt/workspaces/jupyter/install && \
 # VScode
-    pip install python-language-server autopep8 flake8 pylint && \
-    pip install git+git://github.com/dominodatalab/jupyter_codeserver_proxy-.git && \
+    pip install --no-cache-dir python-language-server autopep8 flake8 pylint && \
+    pip install --no-cache-dir git+git://github.com/dominodatalab/jupyter_codeserver_proxy-.git && \
     chmod +x /var/opt/workspaces/vscode/install && \
     /var/opt/workspaces/vscode/install && \
     rm -Rf /opt/code-server/lib/vscode/extensions/npm && \
@@ -188,7 +188,7 @@ RUN \
     /var/opt/workspaces/Jupyterlab/install && \
 # Jupyter server proxy
     conda install -y -c conda-forge nodejs && \
-    pip install jupyter-server-proxy && \
+    pip install --no-cache-dir jupyter-server-proxy && \
     jupyter labextension install @jupyterlab/server-proxy && \
     chown -R ubuntu:ubuntu /home/ubuntu/ && \
 #Cleanup
@@ -201,7 +201,7 @@ RUN \
 #######################################################
 #                     Some fixes                      #
 #######################################################
-RUN pip install pyodbc psycopg2-binary tensorflow && \
+RUN pip install --no-cache-dir pyodbc psycopg2-binary tensorflow && \
     pip cache purge
 # Provide Sudo in container
     #echo "ubuntu    ALL=NOPASSWD: ALL" >> /etc/sudoers && \
@@ -249,7 +249,7 @@ RUN npm init -y && \
 ###############################################################
 #                       Jupyterlab Git                        #
 ###############################################################
-RUN pip install --upgrade jupyterlab-git && jupyter lab build && \
+RUN pip install --no-cache-dir --upgrade jupyterlab-git && jupyter lab build && \
     pip cache purge
 
 ###############################################################
