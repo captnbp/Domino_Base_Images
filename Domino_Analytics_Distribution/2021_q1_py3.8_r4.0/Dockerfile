@@ -23,7 +23,7 @@ RUN \
   locale-gen en_US.UTF-8 && \
   dpkg-reconfigure locales && \
 # INSTALL common things
-  apt-get -y install build-essential wget curl apt-utils net-tools libzmq3-dev ed git ca-certificates iputils-ping dnsutils telnet apt-transport-https vim python3-pip jq unzip krb5-kdc krb5-admin-server && \
+  apt-get -y install sudo build-essential wget curl apt-utils net-tools libzmq3-dev ed git ca-certificates iputils-ping dnsutils telnet netcat pwgen apt-transport-https vim python3-pip jq unzip krb5-kdc krb5-admin-server zsh fonts-powerline htop && \
   apt-get install openjdk-8-jdk -y && \
   update-alternatives --config java && \
   echo "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> /home/ubuntu/.domino-defaults && \
@@ -35,6 +35,13 @@ RUN \
   locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+
+###############################################################
+#                    sudo bug only 20.04                      #
+###############################################################
+RUN echo "Set disable_coredump false" >> /etc/sudo.conf
+
+RUN echo "ubuntu    ALL=NOPASSWD: ALL" >> /etc/sudoers
 
 ###############################################################
 #                 Python 3.8 and Miniconda                    #
@@ -163,7 +170,7 @@ RUN \
     cd /tmp && \
     git clone https://github.com/captnbp/workspace-configs.git /var/opt/workspaces && \
     rm -rf /var/opt/workspaces/workspace-logos && \
-# Jupyter
+    # Jupyter
     chmod +x /var/opt/workspaces/jupyter/install && \
     /var/opt/workspaces/jupyter/install && \
 # VScode
