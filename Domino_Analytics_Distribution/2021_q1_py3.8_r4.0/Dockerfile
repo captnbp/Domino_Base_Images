@@ -28,6 +28,10 @@ RUN \
   update-alternatives --config java && \
   echo "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> /home/ubuntu/.domino-defaults && \
   apt-get -y --no-install-recommends install libssl-dev libxml2-dev libxt-dev libssh2-1-dev libcurl4-openssl-dev libsasl2-dev && \
+# AWS CLI
+  curl -sL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" &&   unzip awscliv2.zip && \
+  aws/install  && \
+  rm -rf awscliv2.zip aws && \
   echo 'export PYTHONIOENCODING=utf-8' >> /home/ubuntu/.domino-defaults && \
   echo 'export LANG=en_US.UTF-8' >> /home/ubuntu/.domino-defaults && \
   echo 'export JOBLIB_TEMP_FOLDER=/tmp' >> /home/ubuntu/.domino-defaults && \
@@ -197,7 +201,7 @@ RUN \
 #######################################################
 #                     Some fixes                      #
 #######################################################
-RUN pip install pyodbc tensorflow && \
+RUN pip install pyodbc psycopg2-binary tensorflow && \
     pip cache purge
 # Provide Sudo in container
     #echo "ubuntu    ALL=NOPASSWD: ALL" >> /etc/sudoers && \
