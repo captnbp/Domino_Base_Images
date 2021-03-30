@@ -132,9 +132,8 @@ RUN \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rm -Rf /tmp/*
-# Install Domino De
-# Oracle
-# ROracle & PyOracle
+
+# Oracle & PyOracle
 RUN \
     mkdir -p /opt/oracle && \
     wget -q https://s3-us-west-2.amazonaws.com/domino-deployment/2016/02/22/instantclient-basic-linux.x64-12.1.0.2.0.zip -O /opt/oracle/instantclient-basic-linux.x64-12.1.0.2.0.zip && \
@@ -198,28 +197,18 @@ RUN \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rm -Rf /tmp/*
-# Install Domino De
 
 #######################################################
 #                     Some fixes                      #
 #######################################################
 RUN pip install --no-cache-dir pyodbc psycopg2-binary tensorflow && \
     pip cache purge
-# Provide Sudo in container
-    #echo "ubuntu    ALL=NOPASSWD: ALL" >> /etc/sudoers && \
 # Fix some npm modules manually that ship with ALL current versions of nodejs
 RUN npm init -y && \
     npm --depth 9999 update && npm -g --depth 9999 update && \
 # DOT-PROP. One can force replace it like this.
     rm -Rf /usr/lib/node_modules/npm/node_modules/dot-prop && \
     wget -qO- https://github.com/sindresorhus/dot-prop/archive/v6.0.1.tar.gz -P /usr/lib/node_modules/npm/node_modules/dot-prop | tar zxvf - --strip-components=1 && \
-# QS. qs have equal issues but for fun node-gyp installs one globally /usr/lib/nodejs/qs and one in the npm modules directory /usr/lib/node_modules/npm/node_modules/qs. Upgrading the qs modules
-    #rm -Rf /usr/lib/nodejs/qs /usr/lib/node_modules/npm/node_modules/qs && \
-    #wget -qO- https://github.com/ljharb/qs/archive/v6.10.1.tar.gz -P /usr/lib/nodejs/qs | tar zxvf - --strip-components=1
-    #wget -qO- https://github.com/ljharb/qs/archive/v6.10.1.tar.gz -P /usr/lib/node_modules/npm/node_modules/qs | tar zxvf - --strip-components=1 && echo STEP3 && \
-# FSTREAM. Some fstream fun /usr/lib/nodejs/fstream
-    #rm -Rf /usr/lib/nodejs/fstream && \
-    #wget -qO- https://github.com/npm/fstream/archive/v1.0.12.tar.gz /usr/lib/nodejs/fstream | tar zxvf - --strip-components=1 && echo STEP4 &&\
 # Some manual clean-ups
 # Let's start with VSCode Handlebars Extension
     rm -Rf /opt/code-server/lib/vscode/extensions/handlebars && \
@@ -233,9 +222,6 @@ RUN npm init -y && \
     /opt/code-server/node_modules/yarn/bin/yarn && \
     /opt/code-server/node_modules/yarn/bin/yarn upgrade --latest && \
     yarn cache clean && \
-# Fixing Elliptic which is part of Conda
-#    sed -i 's/\"6.5.2"/\"6.5.3"/g' /opt/conda/share/jupyter/lab/staging/node_modules/elliptic/package.json && \
-#    npm upgrade --prefix /opt/conda/share/jupyter/lab/staging/node_modules/elliptic/ && \
 # Fix http-proxy module
     sed -i 's/\"1.18.0"/\"1.18.1"/g' /opt/code-server/node_modules/http-proxy/package.json && \
     npm upgrade --prefix /opt/code-server/node_modules/http-proxy/ && \
