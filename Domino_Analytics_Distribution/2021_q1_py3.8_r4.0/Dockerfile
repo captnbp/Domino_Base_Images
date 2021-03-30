@@ -56,8 +56,8 @@ RUN echo "ubuntu    ALL=NOPASSWD: ALL" >> /etc/sudoers
 # https://repo.continuum.io/miniconda/
 ENV CONDA_DIR /opt/conda
 ENV PATH $CONDA_DIR/bin:$PATH
-ENV MINICONDA_VERSION py38_4.8.3
-ENV MINICONDA_MD5 d63adf39f2c220950a063e0529d4ff74
+ENV MINICONDA_VERSION latest
+ENV MINICONDA_MD5 1314b90489f154602fd794accfc90446111514a5a72fe1f71ab83e07de9504a7
 ENV PYTHON_VER 3.8
 # Set environment variables so they are available in Domino runs and workspaces
 RUN \
@@ -66,7 +66,7 @@ RUN \
     echo 'export PATH=/home/ubuntu/.local/bin:$PATH' >> /home/ubuntu/.domino-defaults && \
 # Install Python and Mini-conda
     cd /tmp && \
-    wget --quiet https://repo.continuum.io/miniconda/Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh && \
+    wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh && \
     echo "${MINICONDA_MD5} *Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh" | md5sum -c - && \
     /bin/bash Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh -f -b -p $CONDA_DIR && \
     rm Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh && \
