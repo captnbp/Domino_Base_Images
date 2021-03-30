@@ -31,6 +31,7 @@ bkcharts
 blaze
 bokeh
 boto
+boto3
 bson
 cairocffi
 click
