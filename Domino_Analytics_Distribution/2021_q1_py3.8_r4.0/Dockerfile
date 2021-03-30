@@ -5,6 +5,8 @@ LABEL maintainer="Domino Data Lab <support@dominodatalab.com>"
 LABEL "com.dominodatalab.www"="Domino Data Lab"
 LABEL description="Domino Analytics Distribution"
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 #######################################################
 #              Utilities required by Domino           #
 #######################################################
@@ -23,7 +25,7 @@ RUN \
   locale-gen en_US.UTF-8 && \
   dpkg-reconfigure locales && \
 # INSTALL common things
-  apt-get -y install sudo build-essential wget curl apt-utils net-tools libzmq3-dev ed git ca-certificates iputils-ping dnsutils telnet netcat pwgen apt-transport-https vim python3-pip jq unzip krb5-kdc krb5-admin-server zsh fonts-powerline htop && \
+  apt-get -y install sudo build-essential wget curl apt-utils net-tools libzmq3-dev ed git ca-certificates iputils-ping dnsutils netcat pwgen apt-transport-https vim python3-pip jq unzip krb5-user zsh fonts-powerline htop && \
   apt-get install openjdk-8-jdk -y && \
   update-alternatives --config java && \
   echo "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> /home/ubuntu/.domino-defaults && \
@@ -257,8 +259,6 @@ RUN pip install --no-cache-dir --upgrade jupyterlab-git && jupyter lab build && 
 ###############################################################
 # Removing coursier due to security vulnerabilities
 RUN rm -rf /home/ubuntu/.cache/coursier
-# Removing PyYAML due to security vulnerabilities. Was not pip installed, so removing manually
-RUN rm -rf /opt/conda/lib/python3.8/site-packages/PyYAML-5.3.1.dist-info /opt/conda/lib/python3.8/site-packages/PyYAML-5.3.1-py3.8.egg-info
 # Remove execution permission from conda binary to prevent Anaconda license violations
 #RUN sed -i '/export PATH\=\$CONDA_DIR\/bin\:\$PATH/d' /home/ubuntu/.domino-defaults
-RUN chmod -x $CONDA_DIR/bin/conda
+RUN chmod 755 $CONDA_DIR/bin/conda
