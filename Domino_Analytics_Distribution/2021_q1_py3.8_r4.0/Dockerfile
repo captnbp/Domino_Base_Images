@@ -58,7 +58,6 @@ ENV CONDA_DIR /opt/conda
 ENV PATH $CONDA_DIR/bin:$PATH
 ENV MINICONDA_VERSION latest
 ENV MINICONDA_MD5 1314b90489f154602fd794accfc90446111514a5a72fe1f71ab83e07de9504a7
-ENV PYTHON_VER 3.8
 # Set environment variables so they are available in Domino runs and workspaces
 RUN \
     echo 'export CONDA_DIR=/opt/conda' >> /home/ubuntu/.domino-defaults && \
@@ -67,13 +66,13 @@ RUN \
 # Install Python and Mini-conda
     cd /tmp && \
     wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh && \
-    echo "${MINICONDA_MD5} *Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh" | md5sum -c - && \
+    echo "${MINICONDA_MD5} *Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh" | sha256sum -c - && \
     /bin/bash Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh -f -b -p $CONDA_DIR && \
     rm Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh && \
 # Make all conda packages up-to-date. pip upgrade will NOT work as it will break things in a massive way
     conda update --update-all && \
 # Specify the python version
-    conda install python=${PYTHON_VER} && \
+    conda install python && \
 # Make conda folder permissioned for ubuntu user
     chown ubuntu:ubuntu -R $CONDA_DIR && \
 # Use Mini-conda's pip
@@ -85,18 +84,20 @@ RUN \
     chown -R ubuntu:ubuntu  $CONDA_DIR && \
 # Upgrade Pip
     pip install --no-cache-dir --upgrade pip && \
+#Cleanup
+    conda clean --all --yes && \
+    rm -Rf /tmp/*
+
 # Add various package dependencies and useful libraries
-    apt-get update && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libhdf5-dev libyaml-dev pkg-config libfuse-dev cups libcups2-dev python-gi \
         python-gi-cairo python3-gi python3-gi-cairo gir1.2-gtk-3.0 libsmbclient-dev python-debian swig \
         curl libcurl4-openssl-dev libssl-dev pandoc libgmp-dev libmpfr-dev libmpc-dev && \
-#Cleanup
-    conda clean --all --yes && \
-    pip cache purge && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rm -Rf /tmp/*
+
 # Install Domino Dependencies 
 # Packages used for model APIs and Apps and some extras that are useful
 COPY requirements.txt .
@@ -156,7 +157,6 @@ RUN \
     export PATH=/opt/oracle/instantclient_12_1:${PATH:-} && \
     export LD_LIBRARY_PATH=/opt/oracle/instantclient_12_1:${LD_LIBRARY_PATH:-} && \
     pip install --no-cache-dir cx_Oracle && \
-    pip cache purge && \
     cd /home/ubuntu && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /opt/oracle/instantclient-basic-linux.x64-12.1.0.2.0.zip && \
@@ -193,7 +193,6 @@ RUN \
     jupyter labextension install @jupyterlab/server-proxy && \
     chown -R ubuntu:ubuntu /home/ubuntu/ && \
 #Cleanup
-    pip cache purge && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rm -Rf /tmp/*
@@ -201,8 +200,8 @@ RUN \
 #######################################################
 #                     Some fixes                      #
 #######################################################
-RUN pip install --no-cache-dir pyodbc psycopg2-binary tensorflow && \
-    pip cache purge
+RUN pip install --no-cache-dir pyodbc psycopg2-binary confluent-kafka pyarrow pymssql tensorflow
+
 # Fix some npm modules manually that ship with ALL current versions of nodejs
 RUN npm init -y && \
     npm --depth 9999 update && npm -g --depth 9999 update && \
@@ -237,8 +236,7 @@ RUN npm init -y && \
 ###############################################################
 #                       Jupyterlab Git                        #
 ###############################################################
-RUN pip install --no-cache-dir --upgrade jupyterlab-git && jupyter lab build && \
-    pip cache purge
+RUN pip install --no-cache-dir --upgrade jupyterlab-git && jupyter lab build
 
 ###############################################################
 #                         Clean Up                            #
