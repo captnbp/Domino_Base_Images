@@ -26,9 +26,6 @@ RUN \
   dpkg-reconfigure locales && \
 # INSTALL common things
   apt-get -y install sudo build-essential wget curl apt-utils net-tools libzmq3-dev ed git ca-certificates iputils-ping dnsutils netcat pwgen apt-transport-https vim python3-pip jq unzip krb5-user zsh fonts-powerline htop && \
-  apt-get install openjdk-8-jdk -y && \
-  update-alternatives --config java && \
-  echo "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> /home/ubuntu/.domino-defaults && \
   apt-get -y --no-install-recommends install libssl-dev libxml2-dev libxt-dev libssh2-1-dev libcurl4-openssl-dev libsasl2-dev && \
 # AWS CLI
   curl -sL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" &&   unzip awscliv2.zip && \
@@ -40,7 +37,6 @@ RUN \
   echo 'export LC_ALL=en_US.UTF-8' >> /home/ubuntu/.domino-defaults && \
   locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
-ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
 ###############################################################
 #                    sudo bug only 20.04                      #
@@ -85,7 +81,7 @@ RUN \
 # Upgrade Pip
     pip install --no-cache-dir --upgrade pip && \
 #Cleanup
-    conda clean --all --yes && \
+    conda clean --all --force-pkgs-dirs --yes && \
     rm -Rf /tmp/*
 
 # Add various package dependencies and useful libraries
@@ -103,7 +99,9 @@ RUN apt-get update && \
 COPY requirements.txt .
 RUN $CONDA_DIR/bin/conda install -c conda-forge uWSGI && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip cache purge
+    pip cache purge && \
+    chown ubuntu:ubuntu -R $CONDA_DIR
+
 # Install packages used in Domino quick-start project
 RUN pip install --no-cache-dir git+https://github.com/dominodatalab/python-domino.git
 # Configure matplotlib
@@ -191,7 +189,7 @@ RUN \
     conda install -y -c conda-forge nodejs && \
     pip install --no-cache-dir jupyter-server-proxy && \
     jupyter labextension install @jupyterlab/server-proxy && \
-    chown -R ubuntu:ubuntu /home/ubuntu/ && \
+    chown -R ubuntu:ubuntu /home/ubuntu/ ${CONDA_DIR} && \
 #Cleanup
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
