@@ -172,6 +172,7 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys B97B0AFCAA1A47F044F
 RUN \
     cd /tmp && \
     git clone https://github.com/captnbp/workspace-configs.git /var/opt/workspaces && \
+    cd /var/opt/workspaces && git checkout develop && cd /tmp && \
     rm -rf /var/opt/workspaces/workspace-logos && \
     # Jupyter
     chmod +x /var/opt/workspaces/jupyter/install && \
@@ -199,37 +200,6 @@ RUN \
 #                     Some fixes                      #
 #######################################################
 RUN pip install --no-cache-dir pyodbc psycopg2-binary confluent-kafka pyarrow pymssql tensorflow
-
-# Fix some npm modules manually that ship with ALL current versions of nodejs
-RUN npm init -y && \
-    npm --depth 9999 update && npm -g --depth 9999 update && \
-# DOT-PROP. One can force replace it like this.
-    rm -Rf /usr/lib/node_modules/npm/node_modules/dot-prop && \
-    wget -qO- https://github.com/sindresorhus/dot-prop/archive/v6.0.1.tar.gz -P /usr/lib/node_modules/npm/node_modules/dot-prop | tar zxvf - --strip-components=1 && \
-# Some manual clean-ups
-# Let's start with VSCode Handlebars Extension
-    rm -Rf /opt/code-server/lib/vscode/extensions/handlebars && \
-# Fix handlebars which does not work to update with npm but needs yarn
-    curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
-    echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
-    apt update && apt install -y yarn && \
-    apt update && apt install -y --no-install-recommends yarn && \
-    yarn add handlebars && \
-    yarn upgrade --latest && \
-    /opt/code-server/node_modules/yarn/bin/yarn && \
-    /opt/code-server/node_modules/yarn/bin/yarn upgrade --latest && \
-    yarn cache clean && \
-# Fix http-proxy module
-    sed -i 's/\"1.18.0"/\"1.18.1"/g' /opt/code-server/node_modules/http-proxy/package.json && \
-    npm upgrade --prefix /opt/code-server/node_modules/http-proxy/ && \
-# Fix serialize-javascript
-    sed -i 's/\"2.1.2"/\"4.0.0"/g' /opt/conda/share/jupyter/lab/staging/node_modules/serialize-javascript/package.json && \
-    npm upgrade --prefix /opt/conda/share/jupyter/lab/staging/node_modules/serialize-javascript/ && \
-#Cleanup
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -Rf /tmp/*
-# Install Domino De
 
 ###############################################################
 #                       Jupyterlab Git                        #
